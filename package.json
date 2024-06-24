@@ -1,0 +1,20 @@
+{
+  "name": "rscs-backend",
+  "version": "0.1",
+  "description": "Backend for RSCS project",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^6.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "authors": "Ozzy (@meetg0d)",
+  "license": "ISC"
+}
