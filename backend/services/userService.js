@@ -1,7 +1,10 @@
-const TwitterUser = require('../models/TwitterUserData');
+const { getConnection } = require('../db');
 
 const saveUser = async (userData) => {
   try {
+    const db = getConnection();
+    const usersCollection = db.collection('users');
+
     const { 
       username, 
       name, 
@@ -15,24 +18,26 @@ const saveUser = async (userData) => {
       isClaimed
     } = userData;
     
-    const user = await TwitterUser.findOneAndUpdate(
+    const result = await usersCollection.findOneAndUpdate(
       { username },
       { 
-        username, 
-        name, 
-        avatarUrl, 
-        followers,
-        score,
-        status,
-        isRemiliaOfficial,
-        isMiladyOG,
-        hasGoldenBadge,
-        isClaimed
+        $set: { 
+          username, 
+          name, 
+          avatarUrl, 
+          followers,
+          score,
+          status,
+          isRemiliaOfficial,
+          isMiladyOG,
+          hasGoldenBadge,
+          isClaimed
+        }
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
-    return user;
+    return result.value;
   } catch (error) {
     console.error('Error saving user:', error);
     throw error;
