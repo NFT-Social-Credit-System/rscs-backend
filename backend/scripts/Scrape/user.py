@@ -26,16 +26,21 @@ def get_user_information(users, driver=None, headless=True):
 
             # Following and Followers
             try:
-                follow_selectors = [
+                following_selectors = [
                     "//a[contains(@href, '/following')]/span/span",
-                    "//a[contains(@href, '/followers')]/span/span",
-                    "//div[@data-testid='UserProfileHeader_Items']//span[contains(text(), 'Following') or contains(text(), 'Followers')]"
+                    "//div[@data-testid='UserProfileHeader_Items']//span[contains(text(), 'Following')]",
+                    "//div[@data-testid='primaryColumn']//span[contains(text(), 'Following')]/ancestor::a/span/span"
                 ]
-                following_element = find_element_with_multiple_selectors(driver, follow_selectors)
-                following = following_element.text
+                followers_selectors = [
+                    "//a[contains(@href, '/followers')]/span/span",
+                    "//div[@data-testid='UserProfileHeader_Items']//span[contains(text(), 'Followers')]",
+                    "//div[@data-testid='primaryColumn']//span[contains(text(), 'Followers')]/ancestor::a/span/span"
+                ]
+                following_element = find_element_with_multiple_selectors(driver, following_selectors)
+                following = following_element.text if following_element else "N/A"
         
-                followers_element = find_element_with_multiple_selectors(driver, follow_selectors)
-                followers = followers_element.text
+                followers_element = find_element_with_multiple_selectors(driver, followers_selectors)
+                followers = followers_element.text if followers_element else "N/A"
                
             except Exception as e:
                 print(f"Error fetching following/followers for {user}: {e}")
