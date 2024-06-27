@@ -90,5 +90,5 @@ typings/
 ehthumbs.db
 Thumbs.db
 
-# virtual env dir
-@myenv
+# Ignore myenv directory in backend/scripts
+backend/scripts/myenv/
