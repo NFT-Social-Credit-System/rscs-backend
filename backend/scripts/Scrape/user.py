@@ -11,35 +11,47 @@ from selenium.webdriver.common.by import By
 
 TIMEOUT=10
 
-def get_user_information(users, driver, headless=True, twitter_username=None, twitter_password=None):
-    """ get user information if the "from_account" argument is specified """
+def get_user_information(username, driver, headless=True, twitter_username=None, twitter_password=None):
+    """ Get user information for a single user submission """
+    wait_time = 5  # Longer wait time for individual fetches
+    driver.get(f'https://twitter.com/{username}')
+    sleep(random.uniform(1, wait_time))
 
+    # Check if login is required
+    login_required = is_login_required(driver, wait_time)
+    if login_required:
+        if twitter_username and twitter_password:
+            login_to_twitter(driver, twitter_username, twitter_password)
+            driver.get(f'https://twitter.com/{username}')
+            sleep(random.uniform(1, wait_time))
+        else:
+            print(f"Login required for {username}, but credentials not provided.")
+            return None
+
+    user_data = scrape_user_data(driver, username)
+    return {username: user_data}
+
+def get_bulk_user_information(usernames, driver, headless=True, twitter_username=None, twitter_password=None):
+    """ Get user information for multiple users in bulk """
     users_info = {}
-    # user refers to the handle of the user to scrape
-    for i, user in enumerate(users):
-        driver.get(f'https://twitter.com/{user}')
-        sleep(random.uniform(1, 2))
+    wait_time = 1  # Reduced wait time for bulk fetches
 
-        # Check if login is required
-        login_required = is_login_required(driver)
-        if login_required:
-            if twitter_username and twitter_password:
-                login_to_twitter(driver, twitter_username, twitter_password)
-                driver.get(f'https://twitter.com/{user}')
-                sleep(random.uniform(1, 2))
-            else:
-                print(f"Login required for {user}, but credentials not provided.")
-                continue
-
-        if user is not None:
-            user_data = scrape_user_data(driver, user)
-            users_info[user] = user_data
+    for username in usernames:
+        driver.get(f'https://twitter.com/{username}')
+        try:
+            WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.XPATH, '//div[@data-testid="UserName"]')))
+            user_data = scrape_user_data(driver, username)
+            users_info[username] = user_data
+            print(f"Scraped data for {username}")
+        except Exception as e:
+            print(f"Error scraping data for {username}: {str(e)}")
+            continue
 
     return users_info
 
-def is_login_required(driver):
+def is_login_required(driver, wait_time):
     try:
-        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//div[@data-testid="UserName"]')))
+        WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.XPATH, '//div[@data-testid="UserName"]')))
         return False
     except:
         return True
@@ -47,18 +59,19 @@ def is_login_required(driver):
 def login_to_twitter(driver, username, password):
     driver.get("https://twitter.com/i/flow/login")
     try:
-        username_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "text")))
+        username_input = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.NAME, "text")))
         username_input.send_keys(username)
         driver.find_element(By.XPATH, "//span[text()='Next']").click()
 
-        password_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "password")))
+        password_input = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.NAME, "password")))
         password_input.send_keys(password)
         driver.find_element(By.XPATH, "//span[text()='Log in']").click()
 
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//a[@aria-label='Profile']")))
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, "//a[@aria-label='Profile']")))
         print("Login successful")
     except Exception as e:
         print(f"Login failed: {str(e)}")
+        driver.quit()
         raise
 
 def scrape_user_data(driver, user):
@@ -211,3 +224,4 @@ def find_element_with_multiple_selectors(driver, selectors):
         except:
             continue
     return None
+
