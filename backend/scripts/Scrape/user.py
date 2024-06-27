@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
 TIMEOUT=10
 
@@ -25,10 +26,16 @@ def get_user_information(users, driver=None, headless=True):
 
             # Following and Followers
             try:
-                following = driver.find_element(By.XPATH, '//a[contains(@href,"/following")]/span[1]/span[1]').text
+                follow_selectors = [
+                    "//a[contains(@href, '/following')]/span/span",
+                    "//a[contains(@href, '/followers')]/span/span",
+                    "//div[@data-testid='UserProfileHeader_Items']//span[contains(text(), 'Following') or contains(text(), 'Followers')]"
+                ]
+                following_element = find_element_with_multiple_selectors(driver, follow_selectors)
+                following = following_element.text
         
-                # Changed from followers to verified_followers 
-                followers =  driver.find_element(By.XPATH, '//a[contains(@href,"/verified_followers")]/span[1]/span[1]').text
+                followers_element = find_element_with_multiple_selectors(driver, follow_selectors)
+                followers = followers_element.text
                
             except Exception as e:
                 print(f"Error fetching following/followers for {user}: {e}")
@@ -36,8 +43,16 @@ def get_user_information(users, driver=None, headless=True):
 
             # Website
             try:
-                element = driver.find_element(By.XPATH, '//div[contains(@data-testid,"UserProfileHeader_Items")]//a')
-                website = element.get_attribute("href")
+                website_selectors = [
+                    "//a[contains(@href, 'http') and @rel='noopener noreferrer nofollow']",
+                    "//div[contains(@data-testid, 'UserProfileHeader_Items')]//a[contains(@href, 'http')]",
+                    "//div[contains(@data-testid, 'UserProfileHeader_Items')]//span[contains(text(), '.com') or contains(text(), '.org') or contains(text(), '.net')]"
+                ]
+                website_element = find_element_with_multiple_selectors(driver, website_selectors)
+                if website_element:
+                    website = website_element.get_attribute("href")
+                else:
+                    website = ""
             except Exception as e:
                 print(f"Error fetching website for {user}: {e}")
                 website = ""
@@ -87,57 +102,56 @@ def get_user_information(users, driver=None, headless=True):
                 print(f"Error fetching profile picture for {user}: {e}")
                 pfp_url = ""
 
-            # Join Date, Birthday, and Location
+            # Join Date, Location, and Birth Date
             try:
-                join_date = driver.find_element(By.XPATH, '//div[contains(@data-testid,"UserProfileHeader_Items")]/span[3]').text
-                birthday = driver.find_element(By.XPATH, '//div[contains(@data-testid,"UserProfileHeader_Items")]/span[2]').text
-                location = driver.find_element(By.XPATH, '//div[contains(@data-testid,"UserProfileHeader_Items")]/span[1]').text
+                info_selectors = [
+                    "//div[contains(@data-testid, 'UserProfileHeader_Items')]/span",
+                    "//div[contains(@data-testid, 'UserProfileHeader_Items')]//span"
+                ]
+                info_elements = driver.find_elements(By.XPATH, info_selectors[0]) or driver.find_elements(By.XPATH, info_selectors[1])
+                
+                join_date = "N/A"
+                location = "N/A"
+                birth_date = "N/A"
+
+                for element in info_elements:
+                    text = element.text
+                    if "Joined" in text:
+                        join_date = text
+                    elif "Born" in text:
+                        birth_date = text
+                    elif not any(char.isdigit() for char in text):
+                        location = text
+
             except Exception as e:
-                print(f"Error fetching join date/birthday/location for {user}: {e}")
-                try:
-                    join_date = driver.find_element(By.XPATH, '//div[contains(@data-testid,"UserProfileHeader_Items")]/span[2]').text
-                    span1 = driver.find_element(By.XPATH, '//div[contains(@data-testid,"UserProfileHeader_Items")]/span[1]').text
-                    if hasNumbers(span1):
-                        birthday = span1
-                        location = ""
-                    else:
-                        location = span1
-                        birthday = ""
-                except Exception as e:
-                    print(f"Error fetching join date/birthday/location (second attempt) for {user}: {e}")
-                    try:
-                        join_date = driver.find_element(By.XPATH, '//div[contains(@data-testid,"UserProfileHeader_Items")]/span[1]').text
-                        birthday = ""
-                        location = ""
-                    except Exception as e:
-                        print(f"Error fetching join date/birthday/location (third attempt) for {user}: {e}")
-                        join_date = ""
-                        birthday = ""
-                        location = ""
+                print(f"Error fetching user information for {user}: {e}")
+                join_date = "N/A"
+                location = "N/A"
+                birth_date = "N/A"
 
             print("--------------- " + user + " information : ---------------")
             print("Handle: ", user)
-            print("Banner picture: ", banner_url)
-            print("Profile picture: ", pfp_url)
-            print("Display name : ", displayname)
-            print("Following : ", following)
-            print("Followers : ", followers)
+            print("Banner picture: ", banner_url or "N/A")
+            print("Profile picture: ", pfp_url or "N/A")
+            print("Display name : ", displayname or "N/A")
+            print("Following : ", following or "N/A")
+            print("Followers : ", followers or "N/A")
             print("Location : ", location)
             print("Join date : ", join_date)
-            print("Birth date : ", birthday)
-            print("Description : ", desc)
-            print("Website : ", website)
+            print("Birth date : ", birth_date)
+            print("Description : ", desc or "N/A")
+            print("Website : ", website or "N/A")
             users_info[user] = {
-                "display_name" : displayname,
-                "banner_url" : banner_url,
-                "pfp_url" : pfp_url,
-                "following": following,
-                "followers": followers,
+                "display_name" : displayname or "N/A",
+                "banner_url" : banner_url or "N/A",
+                "pfp_url" : pfp_url or "N/A",
+                "following": following or "N/A",
+                "followers": followers or "N/A",
                 "join_date": join_date,
-                "birthday": birthday,
+                "birth_date": birth_date,
                 "location": location,
-                "website": website,
-                "description": desc
+                "website": website or "N/A",
+                "description": desc or "N/A"
             }
 
     driver.close()
@@ -174,3 +188,12 @@ def get_users_following(users, env, verbose=1, headless=True, wait=2, limit=floa
 
 def hasNumbers(inputString):
     return any(char.isdigit() for char in inputString)
+
+def find_element_with_multiple_selectors(driver, selectors):
+    for selector in selectors:
+        try:
+            element = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, selector)))
+            return element
+        except:
+            continue
+    return None
