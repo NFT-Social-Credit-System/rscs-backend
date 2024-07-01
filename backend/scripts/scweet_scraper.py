@@ -10,16 +10,21 @@ import pickle
 from datetime import datetime, timedelta
 from pymongo.operations import UpdateOne
 from Scrape.user import get_user_information, get_bulk_user_information
+from time import sleep
+import random
+from bs4 import BeautifulSoup
 
 load_dotenv()  # This loads the variables from .env
 
 TWITTER_USERNAME = os.getenv('TWITTER_USERNAME')
 TWITTER_PASSWORD = os.getenv('TWITTER_PASSWORD')
 
+# Establish connection to MongoDB
 def connect_to_mongodb():
     client = MongoClient(os.getenv('MONGODB_URI'))
     return client.RSCS
 
+# Update or insert user data in the database
 def update_user_in_database(user_data):
     db = connect_to_mongodb()
     users_collection = db.Users
@@ -30,6 +35,7 @@ def update_user_in_database(user_data):
     )
     print(f"Database update result: {result.raw_result}")
 
+# Perform Twitter login using Selenium
 def login_to_twitter(driver, username, password):
     driver.get("https://twitter.com/i/flow/login")
     try:
@@ -48,81 +54,94 @@ def login_to_twitter(driver, username, password):
         driver.quit()
         raise
 
+# Check if a Twitter profile is accessible
+def is_profile_accessible(driver):
+    try:
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//div[@data-testid="UserName"]')))
+        return True
+    except:
+        return False
+    
+
+# Save browser cookies to a file
+def save_cookies(driver):
+    cookies = driver.get_cookies()
+    for cookie in cookies:
+        if 'expiry' in cookie:
+            cookie['expiry'] = int(cookie['expiry'])
+        else:
+            cookie['expiry'] = int((datetime.now() + timedelta(days=30)).timestamp())
+    pickle.dump(cookies, open("twitter_cookies.pkl", "wb"))
+
+# Load cookies from file and add them to the browser
+def load_cookies(driver):
+    if os.path.exists('twitter_cookies.pkl'):
+        cookies = pickle.load(open("twitter_cookies.pkl", "rb"))
+        current_time = datetime.now().timestamp()
+        
+        if all(cookie.get('expiry', 0) > current_time for cookie in cookies):
+            driver.get("https://twitter.com")
+            for cookie in cookies:
+                driver.add_cookie(cookie)
+            driver.refresh()
+            return True
+    return False
+
+# Scrape Twitter user data for a list of usernames
 def scrape_twitter_user(usernames: list[str]):
     driver = webdriver.Chrome()
     user_data = {}
     
-    # Check if cookies exist and load them
-    if os.path.exists('twitter_cookies.pkl'):
-        cookies = pickle.load(open("twitter_cookies.pkl", "rb"))
-        driver.get("https://twitter.com")
-        for cookie in cookies:
-            driver.add_cookie(cookie)
-    else:
-        # Log in and save cookies
-        login_to_twitter(driver, TWITTER_USERNAME, TWITTER_PASSWORD)
-        cookies = driver.get_cookies()
-        for cookie in cookies:
-            if 'expiry' in cookie:
-                cookie['expiry'] = int(cookie['expiry'])
-            else:
-                cookie['expiry'] = int((datetime.now() + timedelta(days=30)).timestamp())
-        pickle.dump(cookies, open("twitter_cookies.pkl", "wb"))
+    try:
+        if not load_cookies(driver):
+            print("No valid cookies found. Logging in...")
+            login_to_twitter(driver, TWITTER_USERNAME, TWITTER_PASSWORD)
+            save_cookies(driver)
+        
+        for username in usernames:
+            print(f"Attempting to access {username}'s profile...")
+            driver.get(f'https://twitter.com/{username}')
+            sleep(random.uniform(1, 3))  # Add a small delay
 
-    for username in usernames:
-        driver.get(f"https://twitter.com/{username}")
-        try:
-            WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//div[@data-testid="UserName"]')))
-            user_info = get_user_information([username], driver, headless=False, twitter_username=TWITTER_USERNAME, twitter_password=TWITTER_PASSWORD, bulk_scrape=False)
-            if user_info and username in user_info:
-                user_data[username] = user_info[username]
-                update_user_in_database(user_info[username])
-                print(f"Scraping completed and entry updated for \"{username}\"")
+            if is_profile_accessible(driver):
+                user_info = get_user_information(username, driver)
+                if user_info and username in user_info:
+                    user_data[username] = user_info[username]
+                    update_user_in_database(user_info[username])
+                    print(f"Scraping completed and entry updated for \"{username}\"")
+                else:
+                    print(f"Failed to fetch data for {username}")
             else:
-                print(f"Failed to fetch data for {username}")
-        except Exception as e:
-            print(f"Error loading data for {username}: {str(e)}")
+                print(f"Profile not accessible for {username}")
 
-    driver.quit()
+    except Exception as e:
+        print(f"An error occurred during scraping: {str(e)}")
+    finally:
+        driver.quit()
     return user_data
 
-def scrape_all_users(usernames: list[str]):
-    driver = webdriver.Chrome()
+# Scrape Twitter user data for all users in the database
+def scrape_all_users(usernames: list[str], driver):
     user_data = {}
     
     try:
-        # Check if cookies exist and load them
-        if os.path.exists('twitter_cookies.pkl'):
-            with open('twitter_cookies.pkl', 'rb') as f:
-                cookies = pickle.load(f)
-            current_time = datetime.now().timestamp()
-            
-            if all(cookie.get('expiry', 0) > current_time for cookie in cookies):
-                driver.get("https://twitter.com")
-                for cookie in cookies:
-                    driver.add_cookie(cookie)
-                driver.refresh()
+        for username in usernames:
+            print(f"Attempting to access {username}'s profile...")
+            driver.get(f'https://twitter.com/{username}')
+            sleep(random.uniform(1, 3))  # Add a small delay
+
+            if is_profile_accessible(driver):
+                user_info = get_user_information(username, driver)
+                if user_info and username in user_info:
+                    user_data[username] = user_info[username]
+                    print(f"Successfully scraped data for {username}")
+                else:
+                    print(f"Failed to fetch data for {username}")
             else:
-                login_to_twitter(driver, TWITTER_USERNAME, TWITTER_PASSWORD)
-                cookies = driver.get_cookies()
-        else:
-            login_to_twitter(driver, TWITTER_USERNAME, TWITTER_PASSWORD)
-            cookies = driver.get_cookies()
+                print(f"Profile not accessible for {username}")
 
-        # Update cookie expiration and save
-        for cookie in cookies:
-            if 'expiry' in cookie:
-                cookie['expiry'] = int(cookie['expiry'])
-            else:
-                cookie['expiry'] = int((datetime.now() + timedelta(days=30)).timestamp())
-        with open('twitter_cookies.pkl', 'wb') as f:
-            pickle.dump(cookies, f)
-
-        # Use the new get_bulk_user_information function
-        user_data = get_bulk_user_information(usernames, driver, headless=False, twitter_username=TWITTER_USERNAME, twitter_password=TWITTER_PASSWORD)
-
-        # Batch update the database
         if user_data:
+            print("Updating database with scraped data...")
             db = connect_to_mongodb()
             users_collection = db.Users
             bulk_operations = [
@@ -134,11 +153,10 @@ def scrape_all_users(usernames: list[str]):
 
     except Exception as e:
         print(f"An error occurred during bulk scraping: {str(e)}")
-    finally:
-        driver.quit()
     
     return user_data
 
+# Main function to run the script
 if __name__ == "__main__":
     import sys
     import json
@@ -155,7 +173,7 @@ if __name__ == "__main__":
     print("Usernames:", all_usernames)
 
     # Call scrape_all_users with all usernames from the database
-    user_data = scrape_all_users(all_usernames)
+    user_data = scrape_all_users(all_usernames, driver)
 
     print("Scraped user data:")
     print(json.dumps(user_data, indent=2))

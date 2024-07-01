@@ -11,8 +11,6 @@ import datetime
 import pandas as pd 
 import platform
 from selenium.webdriver.common.keys import Keys
-# import pathlib
-
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -20,10 +18,7 @@ from selenium.webdriver.chrome.service import Service
 import urllib
 
 
-
-
-# current_dir = pathlib.Path(__file__).parent.absolute()
-
+# Extract data from a tweet card
 def get_data(card, save_images=False, save_dir=None):
     """Extract data from tweet card"""
     image_links = []
@@ -117,6 +112,7 @@ def get_data(card, save_images=False, save_dir=None):
     return tweet
 
 
+# Initialize a Chrome driver
 def init_driver(headless=True, proxy=None, show_images=False, option=None):
     """ initiate a chromedriver instance 
         --option : other option to add (str)
@@ -146,12 +142,11 @@ def init_driver(headless=True, proxy=None, show_images=False, option=None):
     driver.set_page_load_timeout(100)
     return driver
 
-
+# Log into the search page
 def log_search_page(driver, since, until_local, lang, display_type, words, to_account, from_account, mention_account,
                     hashtag, filter_replies, proximity,
                     geocode, minreplies, minlikes, minretweets):
     """ Search for this query between since and until_local"""
-    # format the <from_account>, <to_account> and <hash_tags>
     from_account = "(from%3A" + from_account + ")%20" if from_account is not None else ""
     to_account = "(to%3A" + to_account + ")%20" if to_account is not None else ""
     mention_account = "(%40" + mention_account + ")%20" if mention_account is not None else ""
@@ -216,7 +211,7 @@ def log_search_page(driver, since, until_local, lang, display_type, words, to_ac
     driver.get(path)
     return path
 
-
+# Get the last date from a CSV file
 def get_last_date_from_csv(path):
     df = pd.read_csv(path)
     return datetime.datetime.strftime(max(pd.to_datetime(df["Timestamp"])), '%Y-%m-%dT%H:%M:%S.000Z')
