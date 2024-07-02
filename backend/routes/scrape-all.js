@@ -3,7 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const User = require('../models/User');
 
-const FLASK_API_URL = 'http://18.199.167.152:5000';
+const FLASK_API_URL = 'PLACEHOLDER';
 
 router.post('/', async (req, res) => {
   try {

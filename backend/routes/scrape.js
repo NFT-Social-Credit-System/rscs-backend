@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
-const FLASK_API_URL = 'http://18.199.167.152:5000';
+const FLASK_API_URL = 'PLACEHODLER';
 
 router.post('/', async (req, res) => {
   const { username } = req.body;
