@@ -27,6 +27,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.use('/api/users', twitterUsersRouter);
+app.use('/api/scrape', require('./routes/scrape'));
 
 
 
